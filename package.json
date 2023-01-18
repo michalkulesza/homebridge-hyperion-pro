@@ -1,14 +1,15 @@
 {
-  "name": "homebridge-hyperion",
-  "version": "0.1.2",
-  "description": "Hyperion plugin for homebridge: https://github.com/nfarina/homebridge",
+  "name": "homebridge-hyperion-pro",
+  "displayName": "Hyperion with Homebridge",
+  "version": "1.0.0",
+  "description": "Hyperion plugin for homebridge.",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/danimal4326/homebridge-hyperion.git"
+    "url": "git://github.com/michalkulesza/homebridge-hyperion-pro.git"
   },
   "engines": {
     "node": ">=0.12.0",
@@ -18,5 +19,5 @@
     "color": "0.10.0"
   },
   "main": "index.js",
-  "author": "Dan Chlopek"
+  "author": "Michal Kulesza"
 }
