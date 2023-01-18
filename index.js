@@ -12,21 +12,23 @@ module.exports = function (homebridge) {
 }
 
 function HyperionAccessory(log, config) {
-    this.log        = log;
-    this.host       = config["host"];
-    this.port       = config["port"];
-    this.name       = config["name"];
-    this.ambi_name  = config["ambilight_name"];
-    this.priority   = parseInt(config["priority"]) || 100;
-    this.color      = Color().rgb([0, 0, 0]);
-    this.prevColor  = Color().rgb([255, 255, 255]);
+    this.log                = log;
+    this.host               = config["host"];
+    this.port               = config["port"];
+    this.name               = config["name"];
+    this.ambi_name          = config["ambilight_name"];
+    this.priority           = parseInt(config["priority"]) || 100;
+    this.color              = Color().rgb([0, 0, 0]);
+    this.prevColor          = Color().rgb([255, 255, 255]);
     this.lightService;
     this.ambiService;
+    this.ambiBrightness      = 30;
+    this.ambiPrevBrightness  = 30;
     this.infoService;
     this.log("Starting Hyperion Accessory");
    }
 
-HyperionAccessory.prototype.sendHyperionCommand = function (command, color, callback) {
+HyperionAccessory.prototype.sendHyperionCommand = function (command, value, callback) {
     var client = new net.Socket();
     var commands = [];
 
@@ -38,7 +40,7 @@ HyperionAccessory.prototype.sendHyperionCommand = function (command, color, call
             commands.push({
                 command: "color",
                 priority: this.priority,
-                color: color.rgbArray()
+                color: value.rgbArray()
             });
             commands.push({
                 command: "transform",
@@ -52,12 +54,20 @@ HyperionAccessory.prototype.sendHyperionCommand = function (command, color, call
             commands.push({
                 command: "color",
                 priority: this.priority,
-                color: color.rgbArray()
+                color: value.rgbArray()
             });
             break;
         case 'ambilight':
             commands.push({
                 command: "clearall"
+            });
+            break;
+        case 'ambiBrightness':
+            commands.push({
+                "command": "adjustment",
+                "adjustment": {
+                    "brightness": value
+                }
             });
             break;
     }
@@ -68,12 +78,12 @@ HyperionAccessory.prototype.sendHyperionCommand = function (command, color, call
             client.write(JSON.stringify(current_command) + "\n");
         }
         client.end();
-        this.log("Current Color(RGB): " + color.rgbArray());
-        callback(null, color);
+        this.log("Current Color(RGB): " + value.rgbArray());
+        callback(null, value);
     }.bind(this));
 
     client.on('error', function (err) {
-        this.log("Could not send command '" + command + "' with color '" + color.rgbArray() + "'");
+        this.log("Could not send command '" + command + "' with color '" + value.rgbArray() + "'");
         callback(err, this.prevColor);
     }.bind(this));
 }
@@ -182,6 +192,29 @@ HyperionAccessory.prototype.setAmbiState = function (state, callback) {
     }.bind(this));
 }
 
+HyperionAccessory.prototype.setAmbiBrightness = function (level, callback) {
+    this.log("Setting brightness on the Ambilight to '" + level + "'");
+    
+    this.sendHyperionCommand('ambiBrightness', level, function (err, new_value) {
+        if (!err) {
+            if (level > 0) {
+                this.lightService.updateCharacteristic(Characteristic.On, 0);
+                this.ambiService.updateCharacteristic(Characteristic.On, 1);
+            } else {
+                this.ambiService.updateCharacteristic(Characteristic.On, 0);
+                this.lightService.updateCharacteristic(Characteristic.On, 1);
+            }
+            this.ambiBrightness.value(new_value);
+            this.ambiColor.value(new_value);
+        }
+        callback(err, new_value);
+    }.bind(this));
+}
+
+HyperionAccessory.prototype.getAmbiBrightness = function (callback) {
+    callback(null, this.ambiBrightness);
+}
+
 HyperionAccessory.prototype.identify = function (callback) {
     this.log("Identify");
 
@@ -202,43 +235,52 @@ HyperionAccessory.prototype.identify = function (callback) {
     setTimeout(function () {
         this.sendHyperionCommand('color', this.color, function (err, result) { callback(err, true) });
     }.bind(this), 2500);
+    setTimeout(function () {
+        this.sendHyperionCommand('ambiBrightness', this.ambiBrightness, function (err, result) { callback(err, true) });
+    }.bind(this), 3000);
 }
 
 HyperionAccessory.prototype.getServices = function () {
 
     var availableServices = [];
 
-    this.lightService = new Service.Lightbulb(this.name);
-    availableServices.push(this.lightService);
+    // this.lightService = new Service.Lightbulb(this.name);
+    // availableServices.push(this.lightService);
 
-    this.lightService
-        .getCharacteristic(Characteristic.On)
-        .on('set', this.setPowerState.bind(this));
+    // this.lightService
+    //     .getCharacteristic(Characteristic.On)
+    //     .on('set', this.setPowerState.bind(this));
 
-    this.lightService
-        .addCharacteristic(Characteristic.Brightness)
-        .on('set', this.setBrightness.bind(this))
-        .on('get', this.getBrightness.bind(this))
+    // this.lightService
+    //     .addCharacteristic(Characteristic.Brightness)
+    //     .on('set', this.setBrightness.bind(this))
+    //     .on('get', this.getBrightness.bind(this))
 
-    this.lightService
-        .addCharacteristic(Characteristic.Hue)
-        .on('set', this.setHue.bind(this))
-        .on('get', this.getHue.bind(this));
+    // this.lightService
+    //     .addCharacteristic(Characteristic.Hue)
+    //     .on('set', this.setHue.bind(this))
+    //     .on('get', this.getHue.bind(this));
 
-    this.lightService
-        .addCharacteristic(Characteristic.Saturation)
-        .on('set', this.setSaturation.bind(this))
-        .on('get', this.getSaturation.bind(this));
+    // this.lightService
+    //     .addCharacteristic(Characteristic.Saturation)
+    //     .on('set', this.setSaturation.bind(this))
+    //     .on('get', this.getSaturation.bind(this));
 
 
     if (this.ambi_name) {
-        this.ambiService = new Service.Switch(this.ambi_name);
+        this.ambiService = new Service.Lightbulb(this.ambi_name);
         
         availableServices.push(this.ambiService);
 
         this.ambiService
             .getCharacteristic(Characteristic.On)
-            .on('set', this.setAmbiState.bind(this));
+            .on('set', this.setAmbiState.bind(this))
+            // .on('get', this.getAmbiState.bind(this));
+            
+        this.ambiService
+            .getCharacteristic(Characteristic.Brightness)
+            .on('set', this.setAmbiBrightness.bind(this))
+            .on('get', this.getAmbiBrightness.bind(this));
     }
 
     this.infoService = new Service.AccessoryInformation();
@@ -251,4 +293,3 @@ HyperionAccessory.prototype.getServices = function () {
 
     return availableServices;
 }
-
